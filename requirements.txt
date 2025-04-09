@@ -3,9 +3,3 @@ plotly
 pandas
 numpy
 folium
-time
-datetime
-logging
-timedelta
-timezone
-typing
