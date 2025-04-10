@@ -1,5 +1,6 @@
 # --- Streamflow Hydrograph Viewer App ---
 import streamlit as st
+from streamlit import session_state as ss
 from streamlit.components.v1 import html
 from datetime import datetime, timedelta, timezone
 import time
@@ -107,43 +108,180 @@ def get_contrasting_text_color(hex_color):
 
 # --- Define card layout wrapper ---
 def sidebar_card_block(title: str, body_fn):
+    bg_color = "#ffffff" if theme == "Light" else "#1a1a2e"
+    title_color = "#0b5394" if theme == "Light" else "#4da6ff"
+    
     st.sidebar.markdown(f"""
-    <div style="background-color: #1a1a2e; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-        <h4 style="color: #4da6ff; margin-top: 0;">{title}</h4>
+    <div style="background-color: {bg_color}; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+        <h4 style="color: {title_color}; margin-top: 0;">{title}</h4>
     """, unsafe_allow_html=True)
-    body_fn()
-    st.sidebar.markdown("</div>", unsafe_allow_html=True)
+
+
+def get_color_theme():
+    return {
+        "observed": "firebrick",
+        "official_forecast": "royalblue",
+        "threshold_action": "#FFD700" if st.session_state["theme"] == "Light" else "#FFFF00",
+        "threshold_minor": "#FF8C00" if st.session_state["theme"] == "Light" else "#FFA500",
+        "threshold_moderate": "#DC143C" if st.session_state["theme"] == "Light" else "#FF0000",
+        "threshold_major": "#8A2BE2" if st.session_state["theme"] == "Light" else "#DA00FF",
+    }
+
 
 # --- Setup ---
 st.set_page_config(layout="wide", page_title="Streamflow Viewer")
 
+def theme_toggle_buttons():
+    if "theme" not in st.session_state:
+        st.session_state["theme"] = "Dark"
+
+    theme = st.session_state["theme"]
+
+    # Show Light button first (left), then Dark
+    col1, col2 = st.sidebar.columns(2)
+
+    with col1:
+        if st.button("🌞 Light", key="theme_light_btn"):
+            st.session_state["theme"] = "Light"
+
+    with col2:
+        if st.button("🌙 Dark", key="theme_dark_btn"):
+            st.session_state["theme"] = "Dark"
+
+    # Apply stronger style targeting
+    st.markdown("""
+        <style>
+        /* Basic button style */
+        [data-testid="stSidebar"] button[kind="secondary"] {
+            border-radius: 10px;
+            border: 2px solid transparent;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            font-weight: 600;
+            padding: 0.3rem 0.6rem;
+        }
+    
+        [data-testid="stSidebar"] button[kind="secondary"]:hover {
+            border-color: #999999;
+        }
+    
+        /* Force all text and icons (emoji) inside buttons to black */
+        [data-testid="stSidebar"] button[kind="secondary"] * {
+            color: #000000 !important;
+            fill: #000000 !important;
+        }
+    
+        /* Selected button style (just show a border, don't mess with colors) */
+        [data-testid="stSidebar"] button[aria-pressed="true"] {
+            border: 2px solid #ff4b4b !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+
+def apply_custom_css():
+    if st.session_state.get("theme") == "Light":
+        st.markdown("""
+            <style>
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
+            .stSidebar {
+                background-color: #f3f3f3 !important;
+                color: #111 !important;
+            }
+            .stSidebar .css-1v0mbdj, .stSidebar label, .stSidebar h1, .stSidebar h2, .stSidebar h3, .stSidebar h4, .stSidebar h5, .stSidebar h6 {
+                color: #111 !important;
+            }
+            .stRadio > div > label,
+            .stCheckbox > div > label {
+                color: #111 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <style>
+            body {
+                background-color: #0D1B2A !important;
+                color: #e6f1ff !important;
+            }
+    
+            .stSidebar {
+                background-color: #1B263B !important;
+                color: #e6f1ff !important;
+            }
+    
+            /* General text and headers */
+            .stSidebar h1, .stSidebar h2, .stSidebar h3, .stSidebar h4, .stSidebar h5, .stSidebar h6,
+            .stSidebar p, .stSidebar label, .stSidebar span {
+                color: #e6f1ff !important;
+            }
+    
+            /* Checkbox and radio labels */
+            .stCheckbox > div > label,
+            .stRadio > div > label {
+                color: #e6f1ff !important;
+            }
+    
+            /* Help icons and secondary text */
+            .stSidebar .css-15zrgzn,
+            .stSidebar .css-1aehpvj,
+            .stSidebar .css-1v4eu6x,
+            .stSidebar .css-1kyxreq {
+                color: #aaa !important;
+            }
+    
+            /* Force all icons and emojis to inherit brighter color */
+            .stSidebar span, .stSidebar div {
+                color: #e6f1ff !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+theme_toggle_buttons()
+theme = st.session_state["theme"]
+apply_custom_css()
+
+
 # --- Sidebar Header / Branding ---
-st.sidebar.markdown("""
+sidebar_bg = "#f9f9f9" if theme == "Light" else "linear-gradient(90deg, #0D1B2A, #1B263B)"
+text_color = "#111" if theme == "Light" else "#e6f1ff"
+subtext_color = "#333" if theme == "Light" else "#bbb"
+title_color = "#0b5394" if theme == "Light" else "#4da6ff"
+
+st.sidebar.markdown(f"""
 <div style="
-    background: linear-gradient(90deg, #0D1B2A, #1B263B);
+    background: {sidebar_bg};
     padding: 1rem 1.25rem;
     border-radius: 12px;
     margin-bottom: 1rem;
     box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    color: {text_color};
 ">
-    <h2 style="margin: 0; font-size: 1.45rem; color: #4da6ff;">📈 NWPS API Viewer</h2>
-    <p style="font-size: 0.85rem; color: #bbb; margin-top: 0.3rem;">
+    <h2 style="margin: 0; font-size: 1.45rem; color: {title_color};">📈 NWPS API Viewer</h2>
+    <p style="font-size: 0.85rem; color: {subtext_color}; margin-top: 0.3rem;">
         Visualize observed and forecast river stage and flow.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
-# --- Sidebar: Gauge Selection ---
-st.sidebar.title("Options")
 
+# --- Sidebar: Site Selection ---
+st.sidebar.markdown("""
+<div style="margin-bottom: -2.9rem;">
+  <h3 style="margin: 0 0 -0.7rem 0; padding: 0;">📍 Site Selection</h3>
+</div>
+<style>
+[data-testid="stSidebar"] section[data-testid="stTextInput"] {
+    margin-top: -2.4rem !important;
+    padding-top: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
-use_gauge_search = st.sidebar.checkbox(
-    "🔍 Enable gauge search (may take a minute...)",
-    value=False,
-    help="Enable a searchable list of all NWPS gauges. May take a moment to load."
-)
-
-nws_id = None
+use_gauge_search = ss.get("use_gauge_search", False)
 
 if use_gauge_search:
     try:
@@ -162,23 +300,47 @@ if use_gauge_search:
             selected_label = st.sidebar.selectbox("Matching gauges:", display_options, key="match_select")
             nws_id = selected_label.split("(")[-1].replace(")", "")
         else:
-            st.sidebar.warning("No matches found.")
-            nws_id = st.sidebar.text_input("NWS ID", value="CDFP1", key="manual_fallback")
+            nws_id = st.sidebar.text_input(
+                label="",
+                value="",
+                key="manual_fallback",
+                placeholder="Enter NWS ID",
+                help="Enter NWS ID manually if no match found"
+            )
     except Exception as e:
         st.sidebar.warning(f"⚠️ Failed to load gauge list.\n\n{e}")
-        nws_id = st.sidebar.text_input("NWS ID", value="CDFP1", key="manual_fallback")
+        nws_id = st.sidebar.text_input(
+            label="",
+            value="",
+            key="manual_fallback_error",
+            placeholder="Enter NWS ID",
+            help="Enter NWS ID manually (e.g., CDFP1)"
+        )
 else:
-    nws_id = st.sidebar.text_input("NWS ID", value="CDFP1", key="manual_input")
+    nws_id = st.sidebar.text_input(
+        label="",
+        value="CDFP1",
+        key="manual_input",
+        placeholder="Enter NWS ID",
+        help="Enter NWS ID (e.g., CDFP1)"
+    )
 
+
+# --- Sidebar: Advanced Settings ---
 with st.sidebar.expander("🛠️ Advanced Settings"):
-    bypass_cache = st.checkbox("Bypass cache (force fresh data)")
+    previous_value = ss.get("use_gauge_search", False)
+    new_value = st.checkbox(
+        "🔍 Query All Gauges",
+        value=previous_value,
+        help="Enable a searchable list of all NWPS gauges. May take a moment to load."
+    )
 
-if use_gauge_search:
-    with st.spinner("📡 Loading gauges..."):
-        if bypass_cache:
-            list_all_gauges.clear()  # ← Clear Streamlit cache manually
-        gauges = list_all_gauges()
+    # Update and rerun only if value changed
+    if new_value != previous_value:
+        ss.use_gauge_search = new_value
+        st.rerun()
 
+    bypass_cache = st.checkbox("Bypass cache (force fresh reload)")
 
 # --- Main Logic ---
 if nws_id:
@@ -202,7 +364,7 @@ if nws_id:
 
         # Step 2: Flood lines & sidebar controls
         flood_lines = flood_lines_from_metadata(metadata)
-        show_thresholds, days_range, model_selection, show_ensemble_flag, show_hefs_risk_table, show_fim = build_sidebar_controls(flood_lines)
+        show_thresholds, model_selection, show_ensemble_flag, show_hefs_risk_table, show_fim = build_sidebar_controls(flood_lines)
         # Persist the ensemble toggle in session state
         if "show_ensemble" not in st.session_state:
             st.session_state["show_ensemble"] = show_ensemble_flag
@@ -214,6 +376,10 @@ if nws_id:
 
         # Step 3: Date range
         now = datetime.now(timezone.utc)
+        
+        # -- Set zoom range early (using session value or default) for internal logic
+        days_range = ss.get("zoom_slider_main", 6)
+        
         zoom_start = now - timedelta(days=2)
         zoom_end = now + timedelta(days=days_range)
 
@@ -352,21 +518,25 @@ if nws_id:
 
        
         # Build metadata card (concatenated for full safety)
+        panel_bg = "#f9f9f9" if theme == "Light" else "linear-gradient(90deg, #0D1B2A, #1B263B)"
+        panel_text = "#111" if theme == "Light" else "#e6f1ff"
+        accent = "#0b5394" if theme == "Light" else "#a0cfff"
+        
         panel_html = (
-            "<div style=\"background: linear-gradient(90deg, #0D1B2A, #1B263B); padding: 1.25rem 1.75rem; "
-            "border-radius: 14px; color: #e6f1ff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-bottom: 1.5rem;\">"
+            f"<div style=\"background: {panel_bg}; padding: 1.25rem 1.75rem; "
+            f"border-radius: 14px; color: {panel_text}; box-shadow: 0 4px 12px rgba(0,0,0,0.2); margin-bottom: 1.5rem;\">"
             f"<h3 style=\"margin: 0 0 0rem 0; font-size: 1.6rem;\">"
-            f"🌊 {metadata['name']} <span style=\"font-size: 0.9rem; color: #a0cfff;\">({nws_id})</span></h3>"
-            "<div style=\"font-size: 0.95rem;\">"
+            f"🌊 {metadata['name']} <span style=\"font-size: 0.9rem; color: {accent};\">({nws_id})</span></h3>"
+            f"<div style=\"font-size: 0.95rem;\">"
             f"<p style=\"margin: 0.1rem 0;\">📍 <strong>Latest Observation:</strong> "
             f"<code style='color:#fff;background:#333;padding:2px 6px;border-radius:6px;'>{latest_obs}</code></p>"
             f"<p style=\"margin: 0.1rem 0;\">🕓 <strong>Forecast Issued:</strong> {forecast_status}</p>"
         )
 
-        
+
         # Print metadata HTML card first
         st.markdown(panel_html, unsafe_allow_html=True)
-        
+               
         # Add HEFS block separately
         if hefs_display:
             st.markdown(
@@ -376,9 +546,15 @@ if nws_id:
         else:
             st.markdown("</div></div>", unsafe_allow_html=True)
             
-            
-        # Optional: Show/hide risk legend
- #       show_hefs_risk_table = st.sidebar.checkbox("➡️ Show HEFS Risk Table", value=True)
+        # --- Render Zoom Forecast Slider just below metadata card ---
+        days_range = st.slider(
+            "🔍 Zoom Forecast (Days)",
+            min_value=1,
+            max_value=14,
+            value=days_range,
+            key="zoom_slider_main",
+            help="Adjust how far into the future the forecast is shown."
+        )
 
         # Step 7: Gauge map
         show_map = st.sidebar.checkbox("🗺️ Map", value=False, help="Show gauge location and basin.")
@@ -497,7 +673,6 @@ if nws_id:
         
         # --- Now render the figure
         st.plotly_chart(fig, use_container_width=True, config={"scrollZoom": True}, key="main_hydrograph")
-
         
         # Step 8z: Display Clean Threshold Table Below Hydrograph
         threshold_order = ["action", "minor", "moderate", "major"]

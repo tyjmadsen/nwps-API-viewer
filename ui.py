@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit import session_state as ss
 import folium
 from streamlit.components.v1 import html
 from typing import Any, Dict, List, Tuple
@@ -30,13 +31,23 @@ def flood_lines_from_metadata(metadata: Dict[str, Any]) -> Dict[str, Tuple[float
     }
 
 
-def build_sidebar_controls(
-    flood_lines: Dict[str, Tuple[float, str]]
-) -> Tuple[List[str], int, List[str], bool]:
+def build_sidebar_controls(flood_lines: Dict[str, Tuple[float, str]]) -> Tuple[List[str], int, List[str], bool, bool, bool]:
+    from streamlit import session_state as ss
 
-    # --- Color-coded Threshold Toggles ---
-    st.sidebar.markdown("### ⚠️ Flood Thresholds")
-
+    # --- Flood Thresholds Block ---
+    st.sidebar.markdown("""
+    <div style="margin-bottom: -2rem;">
+        <h4 style="margin-bottom: -0.5rem;">⚠️ Flood Thresholds</h4>
+    </div>
+    <style>
+    /* Tighten spacing on multiselect container in sidebar */
+    [data-testid="stSidebar"] [data-testid="stMultiSelect"] {
+        margin-top: -1.4rem;
+        margin-bottom: -0.5rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     threshold_order = ["action", "minor", "moderate", "major"]
     threshold_labels = {
         "action": "🟡 Action",
@@ -44,82 +55,50 @@ def build_sidebar_controls(
         "moderate": "🔴 Moderate",
         "major": "🟣 Major"
     }
-    
-    # Track user selection
     raw_selection = st.sidebar.multiselect(
-        "Select Flood Thresholds:",
+        label="",
         options=threshold_order,
         format_func=lambda k: threshold_labels[k],
         default=["action", "minor"],
-        key="flood_threshold_select",
+        key="flood_threshold_select"
     )
-    
-    # Enforce hierarchy logic
-    show_thresholds = []
-    if raw_selection:
-        max_idx = max(threshold_order.index(k) for k in raw_selection)
-        show_thresholds = threshold_order[: max_idx + 1]
+    max_idx = max((threshold_order.index(k) for k in raw_selection), default=1)
+    show_thresholds = threshold_order[:max_idx + 1]
 
 
-    
-    
-    days_range = st.sidebar.slider("🔍 Zoom Forecast (Days)", 1, 8, 6)
-
-    # --- HEFS Options ---
-    col1, col2 = st.sidebar.columns(2)
-    
-    with col1:
-        show_ensemble = st.checkbox(
-            "HEFS Ensembles",
-            value=False,
-            help="Displays the ensemble forecast spread from HEFS.",
-            key="show_ensemble_checkbox"
-        )
-    
-    with col2:
-        show_hefs_risk_table = st.checkbox(
-            "HEFS Risk Table",
-            value=True,
-            disabled=not show_ensemble,
-            help="Displays risk levels based on HEFS flood exceedance probabilities.",
-            key="show_risk_table_checkbox"
-        )
-
-
-    with st.sidebar.expander("🧪 Forecast Models", expanded=False):
+    # --- Ensemble Settings ---
+    st.sidebar.markdown("### 📈 Forecast Settings")
+    with st.sidebar.container():
         col1, col2 = st.columns(2)
-    
+        with col1:
+            show_ensemble = st.checkbox("HEFS Ensembles", value=False, key="show_ensemble_checkbox")
+        with col2:
+            show_hefs_risk_table = st.checkbox("Risk Table", value=True, disabled=not show_ensemble, key="show_risk_table_checkbox")
+
+    # --- Model Selection ---
+    with st.sidebar.expander("🧪 Forecast Models"):
+        col1, col2 = st.columns(2)
         with col1:
             if st.button("✅ All Models"):
-                st.session_state.model_selection = [
-                    "shortRange", "mediumRange", "mediumRangeBlend", "analysisAssimilation"
-                ]
-    
+                ss.model_selection = ["shortRange", "mediumRange", "mediumRangeBlend", "analysisAssimilation"]
         with col2:
             if st.button("🚫 Clear"):
-                st.session_state.model_selection = []
-        if "model_selection" not in st.session_state:
-            st.session_state.model_selection = [
-                "shortRange", "mediumRange", "mediumRangeBlend", "analysisAssimilation"
-            ]
-    
+                ss.model_selection = []
+
+        if "model_selection" not in ss:
+            ss.model_selection = ["shortRange", "mediumRange", "mediumRangeBlend", "analysisAssimilation"]
+
         model_selection = st.multiselect(
             "Select NWM Models:",
-            options=[
-                "shortRange", "mediumRange", "mediumRangeBlend", "analysisAssimilation"
-            ],
-            default=st.session_state.model_selection,
-            key="model_selection",
+            options=["shortRange", "mediumRange", "mediumRangeBlend", "analysisAssimilation"],
+            default=ss.model_selection,
+            key="model_selection"
         )
 
-        show_fim = st.sidebar.checkbox(
-            "🛰️ Show FIM Layer (if available)",
-            value=True,
-            help="Displays Flood Inundation Mapping (FIM) layers when available."
-        )
+    # --- Optional FIM Toggle ---
+    show_fim = st.sidebar.checkbox("🛰️ Show FIM Layer", value=True)
 
-
-    return show_thresholds, days_range, model_selection, show_ensemble, show_hefs_risk_table, show_fim
+    return show_thresholds, model_selection, show_ensemble, show_hefs_risk_table, show_fim
 
 def render_gauge_map_esri(nws_id: str, lat: float, lon: float) -> None:
     fim_service_url = f"https://mapservices.weather.noaa.gov/static/rest/services/NWS_FIM/FIM_{nws_id.lower()}/MapServer"

@@ -1,6 +1,7 @@
 from typing import Any, Optional, cast
 import numpy as np
 import pandas as pd
+import streamlit as st
 import plotly.graph_objects as go
 from plotly.graph_objs import Figure
 from plotly.subplots import make_subplots
@@ -55,10 +56,10 @@ def add_ensemble_percentile_bands(
             x=percentiles["p50"].index,
             y=percentiles["p50"],
             name="HEFS Median (P50)",
-            mode="lines+markers",
+            mode="lines",
             line=dict(
                 color=colors["line"],
-                width=3,
+                width=2,
                 dash="dashdot",
                 shape="spline",
                 smoothing=1.3,
@@ -241,15 +242,28 @@ def _add_forecast_trace(
     fig: Figure, forecast_df: pd.DataFrame, forecast_flow: pd.Series, COLOR_THEME: dict[str, str]
 ) -> None:
     if not forecast_df.empty:
+        forecast_color = "#B266FF"  # electric purple
+        border_color = "white"
+
         fig.add_trace(
             go.Scatter(
                 x=forecast_df.index,
                 y=forecast_df["stage_ft"],
-                mode="lines",
+                mode="lines+markers",
                 name="Official Forecast",
-                line=dict(color=COLOR_THEME["official_forecast"], width=4),
+                line=dict(color=forecast_color, width=5),
+                marker=dict(
+                    size=5,
+                    symbol="square",
+                    color=forecast_color,
+                    line=dict(width=1.5, color=border_color)
+                ),
                 customdata=forecast_flow.to_numpy().reshape(-1, 1),
-                hovertemplate="%{x|%b %d %H:%M}<br>Forecast: %{y:.1f} ft / %{customdata[0]:.0f} cfs<extra></extra>",
+                hovertemplate=(
+                    "%{x|%b %d %H:%M}<br>"
+                    "<b>Forecast:</b> %{y:.1f} ft / %{customdata[0]:.0f} cfs"
+                    "<extra></extra>"
+                ),
             ),
             secondary_y=False,
         )
@@ -390,7 +404,7 @@ def _apply_layout(
         xaxis_title="Date/Time",
         yaxis=dict(title="Stage (ft)", showgrid=True, gridcolor="#333", range=[yaxis_min, upper_limit]),
         yaxis2=dict(title="Flow (cfs)", overlaying="y", side="right", showgrid=False),
-        template="plotly_dark",
+        template="plotly_white" if st.session_state.get("theme") == "Light" else "plotly_dark",
         height=750,
         margin=dict(l=60, r=40, t=80, b=100),
         dragmode="pan",
