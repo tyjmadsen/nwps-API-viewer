@@ -226,7 +226,7 @@ def compute_percentile_bands(df: pd.DataFrame) -> Dict[str, pd.Series]:
 
     # Step 2: Resample to hourly for smooth plotting
     interpolated = {
-        k: s.resample("1H").interpolate("time") for k, s in raw_percentiles.items()
+        k: s.resample("1h").interpolate("time") for k, s in raw_percentiles.items()
     }
 
     return interpolated
